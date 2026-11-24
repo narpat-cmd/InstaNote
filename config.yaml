@@ -1,0 +1,68 @@
+# InstaNote Configuration
+# Copy to config.local.yaml and fill in your credentials
+
+instagram:
+  app_id: ""
+  app_secret: ""
+  access_token: ""
+  user_id: ""
+  redirect_uri: "http://localhost:8080/callback"
+
+ai_image:
+  provider: "stable_diffusion"
+  model: "stable-diffusion-xl-base-1.0"
+  api_key: ""
+  local_path: ""
+
+research:
+  sources:
+    - "wikipedia"
+    - "manufacturer_website"
+    - "automotive_news"
+    - "specs_database"
+  timeout: 30
+
+automation:
+  daily_limit: 3
+  schedule_enabled: true
+  schedule_times:
+    - "09:00"
+    - "14:00"
+    - "19:00"
+  min_interval_hours: 4
+
+image:
+  width: 1080
+  height: 1350
+  format: "PNG"
+  quality: 95
+  styles:
+    - "Aesthetic Handwritten Illustrated Infographic"
+    - "Handwritten Notebook Style"
+    - "Colorful Study Notes"
+    - "3D Realistic Vehicle Illustration"
+    - "Technical Specification Infographic"
+    - "Hand-drawn Doodle Design"
+    - "Premium Editorial Infographic"
+    - "Realistic Notebook Photography"
+  default_style: "Aesthetic Handwritten Illustrated Infographic"
+
+music:
+  categories:
+    superbikes: "energetic"
+    sports_cars: "cinematic"
+    luxury_cars: "premium"
+    vintage: "retro"
+    racing: "high_energy"
+
+database:
+  path: "data/instanote.db"
+
+logging:
+  level: "INFO"
+  file: "logs/instanote.log"
+
+admin:
+  host: "0.0.0.0"
+  port: 8080
+  secret_key: "change-this-secret-key"

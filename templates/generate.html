@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Generate - InstaNote Admin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-magic me-2"></i>Generate Infographic</h1>
+        <p class="text-muted">Create a new vehicle infographic for Instagram</p>
+    </div>
+</div>
+
+<!-- Generation Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-pencil me-2"></i>New Infographic</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" id="generateForm">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Category <span class="text-danger">*</span></label>
+                    <select name="category" class="form-select" required>
+                        <option value="">Select Category</option>
+                        {% for key, info in categories.items() %}
+                        <option value="{{ key }}">{{ info.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Vehicle Name <span class="text-danger">*</span></label>
+                    <input type="text" name="vehicle_name" class="form-control" placeholder="e.g., Ducati Panigale V4" required>
+                    <div class="form-text">Leave blank to auto-select from category</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Vehicle Year</label>
+                    <input type="number" name="vehicle_year" class="form-control" value="{{ datetime.now().year }}" min="1900" max="{{ datetime.now().year + 1 }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Style</label>
+                    <select name="style" class="form-select">
+                        {% for style in styles %}
+                        <option value="{{ style }}">{{ style }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="form-check mt-4">
+                        <input type="checkbox" name="post_now" class="form-check-input" id="postNow">
+                        <label class="form-check-label" for="postNow">Post to Instagram immediately</label>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="button" class="btn btn-secondary" onclick="randomizeForm()">
+                    <i class="bi bi-shuffle me-1"></i> Randomize
+                </button>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-magic me-2"></i> Generate Infographic
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Generation Result -->
+<div id="resultCard" class="card mb-4" style="display: none;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-check-circle-fill text-success me-2"></i>Generation Complete</h5>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="hideResult()">
+            <i class="bi bi-x"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Preview</h6>
+                <img id="resultImage" src="" alt="Generated Infographic" class="img-fluid rounded shadow">
+            </div>
+            <div class="col-md-6">
+                <h6>Details</h6>
+                <dl class="row">
+                    <dt class="col-sm-4">Style</dt>
+                    <dd class="col-sm-8" id="resultStyle"></dd>
+                    <dt class="col-sm-4">Generation Time</dt>
+                    <dd class="col-sm-8" id="resultTime"></dd>
+                    <dt class="col-sm-4">Image Path</dt>
+                    <dd class="col-sm-8"><code id="resultPath"></code></dd>
+                </dl>
+
+                <h6 class="mt-3">Caption</h6>
+                <textarea id="resultCaption" class="form-control" rows="4" readonly></textarea>
+
+                <h6 class="mt-3">Hashtags</h6>
+                <div id="resultHashtags" class="form-control-plaintext"></div>
+
+                <div class="mt-3 d-grid gap-2">
+                    <button class="btn btn-success" onclick="postResult()">
+                        <i class="bi bi-instagram me-1"></i> Post to Instagram
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="downloadResult()">
+                        <i class="bi bi-download me-1"></i> Download Image
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Generate from Category -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>Quick Generate</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Quickly generate a random vehicle from any category</p>
+        <div class="d-flex flex-wrap gap-2">
+            {% for key, info in categories.items() %}
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="quickGenerate('{{ key }}')">
+                <i class="bi bi-{{ info.icon if info.icon else 'car-front' }} me-1"></i> {{ info.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let lastResult = null;
+
+document.getElementById('generateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+
+    // If vehicle_name is empty, don't send it (let server randomize)
+    if (!data.vehicle_name) {
+        delete data.vehicle_name;
+    }
+
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+
+    try {
+        const response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showResult(result);
+            lastResult = result;
+        } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-magic me-2"></i> Generate Infographic';
+    }
+});
+
+function showResult(result) {
+    document.getElementById('resultImage').src = '/static/images/' + result.image_path.split('/').pop();
+    document.getElementById('resultStyle').textContent = result.style;
+    document.getElementById('resultTime').textContent = result.generation_time.toFixed(2) + 's';
+    document.getElementById('resultPath').textContent = result.image_path;
+    document.getElementById('resultCard').style.display = 'block';
+
+    // Scroll to result
+    document.getElementById('resultCard').scrollIntoView({behavior: 'smooth'});
+}
+
+function hideResult() {
+    document.getElementById('resultCard').style.display = 'none';
+    lastResult = null;
+}
+
+function postResult() {
+    if (!lastResult) return;
+
+    // We need to get the topic info from somewhere
+    // For now, just alert
+    alert('Posting functionality requires topic data. Use the form with "Post now" checked.');
+}
+
+function downloadResult() {
+    if (!lastResult) return;
+    const link = document.createElement('a');
+    link.href = '/static/images/' + lastResult.image_path.split('/').pop();
+    link.download = lastResult.image_path.split('/').pop();
+    link.click();
+}
+
+function quickGenerate(category) {
+    document.querySelector('select[name="category"]').value = category;
+    document.querySelector('input[name="vehicle_name"]').value = '';
+    document.getElementById('generateForm').dispatchEvent(new Event('submit'));
+}
+
+function randomizeForm() {
+    const categories = document.querySelector('select[name="category"]').options;
+    const randomIndex = Math.floor(Math.random() * (categories.length - 1)) + 1;
+    categories[randomIndex].selected = true;
+    document.querySelector('input[name="vehicle_name"]').value = '';
+    document.getElementById('generateForm').dispatchEvent(new Event('submit'));
+}
+</script>
+{% endblock %}

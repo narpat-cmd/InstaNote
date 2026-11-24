@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block title %}Scheduler - InstaNote Admin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-clock me-2"></i>Scheduler</h1>
+        <p class="text-muted">Manage automated posting schedule</p>
+    </div>
+</div>
+
+<!-- Scheduler Controls -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Scheduler Control</h5>
+        <div>
+            <span class="badge {% if stats.is_running %}bg-success{% else %}bg-danger{% endif %} fs-6 me-2">
+                {% if stats.is_running %}Running{% else %}Stopped{% endif %}
+            </span>
+            <button class="btn btn-primary btn-sm" onclick="reschedule()" id="rescheduleBtn" {% if not stats.is_running %}disabled{% endif %}>
+                <i class="bi bi-arrow-clockwise me-1"></i> Reschedule
+            </button>
+            <button class="btn btn-success btn-sm" onclick="triggerPostNow()">
+                <i class="bi bi-play-circle me-1"></i> Post Now
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card stat-card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.pending_jobs }}</h2>
+                        <small>Pending Jobs</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.successful_posts }}</h2>
+                        <small>Successful</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.failed_posts }}</h2>
+                        <small>Failed</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.total_runs }}</h2>
+                        <small>Total Runs</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Configuration</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Daily Post Times</span>
+                        <span>{{ config.post_times|join(', ') }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Daily Limit</span>
+                        <span>{{ config.daily_limit }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Timezone</span>
+                        <span>{{ config.timezone }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Enabled</span>
+                        <span><i class="bi bi-{{ 'check-circle-fill text-success' if config.enabled else 'x-circle-fill text-danger' }}"></i></span>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Next Scheduled Posts</h6>
+                {% if stats.next_post_time %}
+                <div class="alert alert-info">
+                    <i class="bi bi-calendar-event me-2"></i>
+                    <strong>Next Post:</strong> {{ stats.next_post_time }}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    No scheduled posts. Click "Reschedule" to generate new schedule.
+                </div>
+                {% endif %}
+
+                {% if stats.last_post_time %}
+                <div class="alert alert-secondary">
+                    <i class="bi bi-clock-history me-2"></i>
+                    <strong>Last Post:</strong> {{ stats.last_post_time }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pending Jobs -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-hourglass-split me-2"></i>Pending Jobs</h5>
+        <span class="badge bg-primary">{{ pending_jobs|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if pending_jobs %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Topic</th>
+                        <th>Category</th>
+                        <th>Scheduled</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in pending_jobs %}
+                    <tr id="job-{{ job.id }}">
+                        <td><code>{{ job.id[:8] }}...</code></td>
+                        <td>
+                            {% if job.topic %}
+                            <strong>{{ job.topic.vehicle_year }} {{ job.topic.vehicle_name }}</strong>
+                            {% else %}
+                            <span class="text-muted">Not assigned</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ job.topic.category_key.replace('_', ' ').title() if job.topic else 'N/A' }}</td>
+                        <td>{{ job.scheduled_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <span class="badge {% if job.status.value == 'pending' %}bg-warning{% elif job.status.value == 'running' %}bg-info{% else %}bg-secondary{% endif %}">
+                                {{ job.status.value.title() }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="runJob('{{ job.id }}')" title="Run Now">
+                                    <i class="bi bi-play"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="cancelJob('{{ job.id }}')" title="Cancel">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="bi bi-calendar-x display-1 text-muted"></i>
+            <h5 class="text-muted mt-2">No pending jobs</h5>
+            <p class="text-muted">Click "Reschedule" to generate new scheduled posts</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Job History -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Job History</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if history %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Topic</th>
+                        <th>Category</th>
+                        <th>Scheduled</th>
+                        <th>Started</th>
+                        <th>Completed</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in history %}
+                    <tr>
+                        <td><code>{{ job.id[:8] }}...</code></td>
+                        <td>
+                            {% if job.topic %}
+                            <strong>{{ job.topic.vehicle_year }} {{ job.topic.vehicle_name }}</strong>
+                            {% else %}
+                            <span class="text-muted">Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ job.topic.category_key.replace('_', ' ').title() if job.topic else 'N/A' }}</td>
+                        <td>{{ job.scheduled_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ job.started_at.strftime('%H:%M:%S') if job.started_at else '-' }}</td>
+                        <td>{{ job.completed_at.strftime('%H:%M:%S') if job.completed_at else '-' }}</td>
+                        <td>
+                            {% if job.started_at and job.completed_at %}
+                            {{ (job.completed_at - job.started_at).total_seconds()|round(1) }}s
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {% if job.status.value == 'completed' %}bg-success{% elif job.status.value == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ job.status.value.title() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if job.error %}
+                            <small class="text-danger">{{ job.error|truncate(50) }}</small>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="bi bi-clock-history display-1 text-muted"></i>
+            <h5 class="text-muted mt-2">No job history yet</h5>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function reschedule() {
+    const btn = document.getElementById('rescheduleBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Rescheduling...';
+
+    fetch('/api/reschedule', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i> Reschedule';
+        });
+}
+
+function triggerPostNow() {
+    const category = prompt('Category (optional):');
+    fetch('/api/post-now', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({category: category || null})
+    })
+        .then(r => r.json())
+        .then(data => {
+            alert('Job started: ' + data.job_id);
+            location.reload();
+        });
+}
+
+function runJob(jobId) {
+    fetch('/api/job/' + jobId + '/run', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+}
+
+function cancelJob(jobId) {
+    if (confirm('Cancel this job?')) {
+        fetch('/api/job/' + jobId + '/cancel', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+    }
+}
+</script>
+{% endblock %}

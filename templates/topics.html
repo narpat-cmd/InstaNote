@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Topics - InstaNote Admin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-images me-2"></i>Published Topics</h1>
+        <p class="text-muted">Browse all published vehicle infographics</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Category</label>
+                <select name="category" class="form-select">
+                    <option value="">All Categories</option>
+                    {% for key, info in categories.items() %}
+                    <option value="{{ key }}" {% if key == current_category %}selected{% endif %}>
+                        {{ info.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2"><i class="bi bi-funnel me-1"></i>Filter</button>
+                <a href="{{ url_for('topics') }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Topics List -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Topics ({{ total }} total)</h5>
+        <span class="badge bg-primary">{{ page }} / {{ total_pages }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if posts %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Thumbnail</th>
+                        <th>Vehicle</th>
+                        <th>Category</th>
+                        <th>Posted</th>
+                        <th>Instagram ID</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in posts %}
+                    <tr>
+                        <td>
+                            {% if post.image_path %}
+                            <img src="{{ url_for('serve_image', filename=post.image_path.split('/')[-1]) }}"
+                                 alt="{{ post.vehicle_name }}" class="img-thumbnail" style="width: 80px; height: 100px; object-fit: cover;">
+                            {% else %}
+                            <span class="text-muted">No image</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ post.vehicle_year }} {{ post.vehicle_name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ post.category_key.replace('_', ' ').title() }}</small>
+                        </td>
+                        <td>{{ post.category_key.replace('_', ' ').title() }}</td>
+                        <td>{{ post.published_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            {% if post.instagram_post_id %}
+                            <code>{{ post.instagram_post_id }}</code>
+                            <br>
+                            <a href="https://www.instagram.com/p/{{ post.instagram_post_id }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-instagram"></i> View
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Not posted</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                {% if post.image_path %}
+                                <a href="{{ url_for('serve_image', filename=post.image_path.split('/')[-1]) }}"
+                                   target="_blank" class="btn btn-outline-secondary" title="View Image">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% endif %}
+                                <button class="btn btn-outline-danger" onclick="deleteTopic('{{ post.id }}')" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-images display-1 text-muted"></i>
+            <h4 class="text-muted mt-3">No topics found</h4>
+            <p class="text-muted">Generate your first infographic to get started!</p>
+            <a href="{{ url_for('generate') }}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> Generate</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('topics', category=current_category, page=page-1) }}">Previous</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('topics', category=current_category, page=p) }}">{{ p }}</a>
+                </li>
+                {% endfor %}
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('topics', category=current_category, page=page+1) }}">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function deleteTopic(id) {
+    if (confirm('Are you sure you want to delete this topic?')) {
+        fetch('/api/topic/' + id, {method: 'DELETE'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+    }
+}
+</script>
+{% endblock %}
