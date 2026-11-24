@@ -260,7 +260,12 @@ def create_app(config_path: Optional[str] = None) -> tuple:
     @app.route('/api/generate', methods=['POST'])
     @login_required
     def api_generate():
-        data = request.json
+        try:
+            data = request.json
+        except Exception:
+            return jsonify({'success': False, 'error': 'Invalid JSON payload'}), 400
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid JSON payload'}), 400
         category = data.get('category')
         vehicle_name = data.get('vehicle_name')
         vehicle_year = data.get('vehicle_year', datetime.now().year)
@@ -327,7 +332,12 @@ def create_app(config_path: Optional[str] = None) -> tuple:
             })
 
         # POST - save settings
-        data = request.json
+        try:
+            data = request.json
+        except Exception:
+            return jsonify({'success': False, 'error': 'Invalid JSON payload'}), 400
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid JSON payload'}), 400
         section = data.get('section')
 
         try:
@@ -479,6 +489,13 @@ def create_app(config_path: Optional[str] = None) -> tuple:
 
     # Start background task
     socketio.start_background_task(background_stats_emitter)
+
+    # Add error handlers for proper JSON responses
+    from werkzeug.exceptions import BadRequest
+
+    @app.errorhandler(BadRequest)
+    def handle_bad_request(e):
+        return jsonify({'success': False, 'error': 'Invalid JSON payload'}), 400
 
     return app, socketio
 
