@@ -101,6 +101,11 @@ def get_topic_history() -> List[Dict]:
     return {'topics': [], 'last_updated': None}
 
 
+def select_topic() -> Dict:
+    """Select a random topic - module-level function for admin panel import"""
+    return select_random_topic()
+
+
 class Topic:
     """Represents a vehicle topic"""
     def __init__(self, category_key: str, vehicle_name: str, vehicle_year: int = None):
