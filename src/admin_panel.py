@@ -123,7 +123,8 @@ def create_app(config_path: Optional[str] = None) -> tuple:
     @app.route('/scheduler')
     @login_required
     def scheduler_view():
-        jobs = scheduler.get_pending_jobs()
+        all_jobs = scheduler.get_all_jobs()
+        jobs = [(jid, jdata) for jid, jdata in all_jobs.items() if jdata.get('status').value == 'pending']
         history = scheduler.get_recent_history(50)
         stats = scheduler.get_stats()
 
@@ -131,7 +132,7 @@ def create_app(config_path: Optional[str] = None) -> tuple:
                              pending_jobs=jobs,
                              history=history,
                              stats=stats,
-                             config=scheduler.config.automation)
+                             config=get_config().automation)
 
     @app.route('/generate', methods=['GET', 'POST'])
     @login_required
@@ -180,7 +181,8 @@ def create_app(config_path: Optional[str] = None) -> tuple:
                 logger.error(f"Generation failed: {e}", exc_info=True)
                 flash(f'Generation failed: {str(e)}', 'error')
 
-        styles = content_generator.config.image.styles
+        config = get_config()
+        styles = config.image.styles if hasattr(config.image, 'styles') else ['Aesthetic Handwritten Illustrated Infographic', 'Minimalist Modern', 'Vintage Retro', 'Bold & Colorful', 'Professional Clean']
         return render_template('generate.html',
                              categories=VEHICLE_CATEGORIES,
                              styles=styles)

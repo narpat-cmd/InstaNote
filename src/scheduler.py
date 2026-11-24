@@ -87,6 +87,18 @@ class InstaNoteScheduler:
         # Sort by created_at descending and return top 'limit' entries
         history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         return history[:limit]
+    
+    def get_pending_jobs(self) -> list:
+        """Get pending jobs for dashboard"""
+        return [
+            {
+                'job_id': job_id,
+                'schedule': job_data.get('schedule', 'unknown'),
+                'created_at': job_data.get('created_at', 'unknown')
+            }
+            for job_id, job_data in self._jobs.items()
+            if job_data.get('status') == JobStatus.PENDING
+        ]
 
 
 def get_scheduler() -> InstaNoteScheduler:
