@@ -17,6 +17,9 @@
     </div>
     <div class="card-body">
         <form method="POST" id="generateForm">
+            <input type="hidden" name="generated_caption" id="generatedCaption" value="">
+            <input type="hidden" name="generated_hashtags" id="generatedHashtags" value="">
+
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Category <span class="text-danger">*</span></label>
@@ -121,7 +124,7 @@
         <div class="d-flex flex-wrap gap-2">
             {% for key, info in categories.items() %}
             <button type="button" class="btn btn-outline-primary btn-sm" onclick="quickGenerate('{{ key }}')">
-                <i class="bi bi-{{ info.icon if info.icon else 'car-front' }} me-1"></i> {{ info.name }}
+                <i class="bi bi-{{ info.icon if info.icon else 'car front' }} me-1"></i> {{ info.name }}
             </button>
             {% endfor %}
         </div>
@@ -161,10 +164,10 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
             showResult(result);
             lastResult = result;
         } else {
-            alert('Error: ' + (result.error || 'Unknown error'));
+            showToast('Error: ' + (result.error || 'Unknown error'), 'danger');
         }
     } catch (err) {
-        alert('Error: ' + err.message);
+        showToast('Error: ' + err.message, 'danger');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-magic me-2"></i> Generate Infographic';
@@ -172,10 +175,26 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
 });
 
 function showResult(result) {
-    document.getElementById('resultImage').src = '/static/images/' + result.image_path.split('/').pop();
-    document.getElementById('resultStyle').textContent = result.style;
-    document.getElementById('resultTime').textContent = result.generation_time.toFixed(2) + 's';
+    // Extract image filename from path
+    const imageFilename = result.image_path.split('/').pop();
+    document.getElementById('resultImage').src = '/images/' + imageFilename;
+    document.getElementById('resultStyle').textContent = result.style || 'Aesthetic Handwritten Illustrated Infographic';
+    document.getElementById('resultTime').textContent = (result.generation_time || 0).toFixed(2) + 's';
     document.getElementById('resultPath').textContent = result.image_path;
+
+    // Store caption and hashtags for posting
+    if (result.caption) {
+        document.getElementById('resultCaption').value = result.caption;
+    } else {
+        document.getElementById('resultCaption').value = '';
+    }
+
+    if (result.hashtags && result.hashtags.length > 0) {
+        document.getElementById('resultHashtags').innerHTML = result.hashtags.map(h => '<span class="badge bg-primary me-1">' + h + '</span>').join('');
+    } else {
+        document.getElementById('resultHashtags').innerHTML = '<span class="text-muted">No hashtags auto-generated</span>';
+    }
+
     document.getElementById('resultCard').style.display = 'block';
 
     // Scroll to result
@@ -187,19 +206,37 @@ function hideResult() {
     lastResult = null;
 }
 
-function postResult() {
+async function postResult() {
     if (!lastResult) return;
 
-    // We need to get the topic info from somewhere
-    // For now, just alert
-    alert('Posting functionality requires topic data. Use the form with "Post now" checked.');
+    const caption = document.getElementById('resultCaption').value;
+    const hashtagsElem = document.getElementById('resultHashtags');
+    const hashtags = Array.from(hashtagsElem.querySelectorAll('.badge')).map(b => b.textContent);
+
+    const response = await fetch('/api/generate-post', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            image_path: lastResult.image_path,
+            caption: caption,
+            hashtags: hashtags
+        })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+        showToast('Posted to Instagram: ' + (data.instagram_post_id || 'Success'), 'success');
+    } else {
+        showToast('Post failed: ' + (data.error || 'Unknown error'), 'danger');
+    }
 }
 
 function downloadResult() {
     if (!lastResult) return;
+    const imageFilename = lastResult.image_path.split('/').pop();
     const link = document.createElement('a');
-    link.href = '/static/images/' + lastResult.image_path.split('/').pop();
-    link.download = lastResult.image_path.split('/').pop();
+    link.href = '/images/' + imageFilename;
+    link.download = imageFilename;
     link.click();
 }
 
@@ -211,6 +248,7 @@ function quickGenerate(category) {
 
 function randomizeForm() {
     const categories = document.querySelector('select[name="category"]').options;
+    // Skip first option (empty)
     const randomIndex = Math.floor(Math.random() * (categories.length - 1)) + 1;
     categories[randomIndex].selected = true;
     document.querySelector('input[name="vehicle_name"]').value = '';

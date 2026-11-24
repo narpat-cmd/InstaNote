@@ -101,7 +101,7 @@ class InstagramPoster:
         """Verify if post was published successfully"""
         if not self.is_configured():
             return True  # Simulated success
-        
+
         try:
             resp = requests.get(
                 f"{self.api_url}/{post_id}",
@@ -110,6 +110,18 @@ class InstagramPoster:
             return resp.status_code == 200
         except:
             return True  # Assume success for simulation
+
+    def updatable_post(self, image_path: str, caption: str, hashtags: List[str] = None) -> Dict:
+        """Post an already-generated image to Instagram (for manual posting from generate page)"""
+        path = Path(image_path)
+        if not path.exists():
+            return self._simulate_upload(path, caption, hashtags)
+
+        full_caption = caption
+        if hashtags:
+            full_caption = caption + '\n\n' + ' '.join(hashtags)
+
+        return self.upload_image(path, full_caption, hashtags)
 
 
 def post_to_instagram(image_path: Path, caption: str, hashtags: List[str] = None) -> Dict:

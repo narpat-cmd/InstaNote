@@ -2,6 +2,20 @@
 
 {% block title %}Scheduler - InstaNote Admin{% endblock %}
 
+{% block extra_css %}
+<style>
+    .status-badge {
+        font-weight: 500;
+        padding: 0.375rem 0.75rem;
+        border-radius: 9999px;
+    }
+    .job-id {
+        font-family: 'Monaco', 'Menlo', monospace;
+        font-size: 0.8125rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
@@ -15,7 +29,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Scheduler Control</h5>
         <div>
-            <span class="badge {% if stats.is_running %}bg-success{% else %}bg-danger{% endif %} fs-6 me-2">
+            <span id="schedulerStatus" class="badge {% if stats.is_running %}bg-success{% else %}bg-danger{% endif %} fs-6 me-2">
                 {% if stats.is_running %}Running{% else %}Stopped{% endif %}
             </span>
             <button class="btn btn-primary btn-sm" onclick="reschedule()" id="rescheduleBtn" {% if not stats.is_running %}disabled{% endif %}>
@@ -31,7 +45,7 @@
             <div class="col-md-3">
                 <div class="card stat-card bg-primary text-white">
                     <div class="card-body text-center">
-                        <h2>{{ stats.pending_jobs }}</h2>
+                        <h2 id="pendingJobs">{{ stats.pending_jobs }}</h2>
                         <small>Pending Jobs</small>
                     </div>
                 </div>
@@ -39,7 +53,7 @@
             <div class="col-md-3">
                 <div class="card stat-card bg-success text-white">
                     <div class="card-body text-center">
-                        <h2>{{ stats.successful_posts }}</h2>
+                        <h2 id="successfulPosts">{{ stats.successful_posts }}</h2>
                         <small>Successful</small>
                     </div>
                 </div>
@@ -47,7 +61,7 @@
             <div class="col-md-3">
                 <div class="card stat-card bg-danger text-white">
                     <div class="card-body text-center">
-                        <h2>{{ stats.failed_posts }}</h2>
+                        <h2 id="failedPosts">{{ stats.failed_posts }}</h2>
                         <small>Failed</small>
                     </div>
                 </div>
@@ -55,7 +69,7 @@
             <div class="col-md-3">
                 <div class="card stat-card bg-info text-white">
                     <div class="card-body text-center">
-                        <h2>{{ stats.total_runs }}</h2>
+                        <h2 id="totalRuns">{{ stats.total_runs }}</h2>
                         <small>Total Runs</small>
                     </div>
                 </div>
@@ -134,20 +148,40 @@
                 <tbody>
                     {% for job in pending_jobs %}
                     <tr id="job-{{ job.id }}">
-                        <td><code>{{ job.id[:8] }}...</code></td>
+                        <td><code class="job-id">{{ job.id[:8] }}...</code></td>
                         <td>
                             {% if job.topic %}
-                            <strong>{{ job.topic.vehicle_year }} {{ job.topic.vehicle_name }}</strong>
+                            <strong>{{ job.topic.vehicle_year if job.topic.vehicle_year else '' }} {{ job.topic.vehicle_name }}</strong>
                             {% else %}
                             <span class="text-muted">Not assigned</span>
                             {% endif %}
                         </td>
-                        <td>{{ job.topic.category_key.replace('_', ' ').title() if job.topic else 'N/A' }}</td>
-                        <td>{{ job.scheduled_time.strftime('%Y-%m-%d %H:%M') }}</td>
                         <td>
-                            <span class="badge {% if job.status.value == 'pending' %}bg-warning{% elif job.status.value == 'running' %}bg-info{% else %}bg-secondary{% endif %}">
-                                {{ job.status.value.title() }}
+                            {% if job.topic and job.topic.category_key %}
+                            {{ job.topic.category_key.replace('_', ' ').title() }}
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if job.scheduled_time %}
+                            {% if job.scheduled_time is string %}
+                            {{ job.scheduled_time }}
+                            {% else %}
+                            {{ job.scheduled_time.strftime('%Y-%m-%d %H:%M') }}
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if hasattr(job, 'status') and job.status %}
+                            <span class="badge status-badge {% if job.status.value == 'pending' %}bg-warning{% elif job.status.value == 'running' %}bg-info{% else %}bg-secondary{% endif %}">
+                                {{ job.status.value.title() if job.status.value else 'Pending' }}
                             </span>
+                            {% else %}
+                            <span class="badge status-badge bg-warning">Pending</span>
+                            {% endif %}
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm">
@@ -189,45 +223,53 @@
                         <th>Topic</th>
                         <th>Category</th>
                         <th>Scheduled</th>
+                        <th>Status</th>
                         <th>Started</th>
                         <th>Completed</th>
-                        <th>Duration</th>
-                        <th>Status</th>
                         <th>Error</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for job in history %}
                     <tr>
-                        <td><code>{{ job.id[:8] }}...</code></td>
+                        <td><code class="job-id">{{ job.id[:8] }}...</code></td>
                         <td>
                             {% if job.topic %}
-                            <strong>{{ job.topic.vehicle_year }} {{ job.topic.vehicle_name }}</strong>
+                            <strong>{{ job.topic.vehicle_year if job.topic.vehicle_year else '' }} {{ job.topic.vehicle_name }}</strong>
                             {% else %}
                             <span class="text-muted">Unknown</span>
                             {% endif %}
                         </td>
-                        <td>{{ job.topic.category_key.replace('_', ' ').title() if job.topic else 'N/A' }}</td>
-                        <td>{{ job.scheduled_time.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td>{{ job.started_at.strftime('%H:%M:%S') if job.started_at else '-' }}</td>
-                        <td>{{ job.completed_at.strftime('%H:%M:%S') if job.completed_at else '-' }}</td>
                         <td>
-                            {% if job.started_at and job.completed_at %}
-                            {{ (job.completed_at - job.started_at).total_seconds()|round(1) }}s
+                            {% if job.topic and job.topic.category_key %}
+                            {{ job.topic.category_key.replace('_', ' ').title() }}
                             {% else %}
-                            -
+                            <span class="text-muted">N/A</span>
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge {% if job.status.value == 'completed' %}bg-success{% elif job.status.value == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {% if job.scheduled_time %}
+                            {% if job.scheduled_time is string %}
+                            {{ job.scheduled_time }}
+                            {% else %}
+                            {{ job.scheduled_time.strftime('%Y-%m-%d %H:%M') }}
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge status-badge {% if job.status.value == 'completed' %}bg-success{% elif job.status.value == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
                                 {{ job.status.value.title() }}
                             </span>
                         </td>
+                        <td>{{ job.started_at.strftime('%H:%M:%S') if job.started_at and job.started_at is defined else '-' }}</td>
+                        <td>{{ job.completed_at.strftime('%H:%M:%S') if job.completed_at and job.completed_at is defined else '-' }}</td>
                         <td>
                             {% if job.error %}
                             <small class="text-danger">{{ job.error|truncate(50) }}</small>
                             {% else %}
-                            -
+                            <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -258,8 +300,11 @@ function reschedule() {
             if (data.success) {
                 location.reload();
             } else {
-                alert('Error: ' + data.error);
+                showToast('Error: ' + data.error, 'danger');
             }
+        })
+        .catch(err => {
+            showToast('Request failed: ' + err.message, 'danger');
         })
         .finally(() => {
             btn.disabled = false;
@@ -276,35 +321,48 @@ function triggerPostNow() {
     })
         .then(r => r.json())
         .then(data => {
-            alert('Job started: ' + data.job_id);
+            showToast('Job started: ' + data.job_id, 'success');
             location.reload();
+        })
+        .catch(err => {
+            showToast('Request failed: ' + err.message, 'danger');
         });
 }
 
 function runJob(jobId) {
+    if (!confirm('Run this job now?')) return;
+
     fetch('/api/job/' + jobId + '/run', {method: 'POST'})
         .then(r => r.json())
         .then(data => {
             if (data.success) {
+                showToast('Job executed successfully', 'success');
                 location.reload();
             } else {
-                alert('Error: ' + data.error);
+                showToast('Error: ' + data.error, 'danger');
             }
+        })
+        .catch(err => {
+            showToast('Request failed: ' + err.message, 'danger');
         });
 }
 
 function cancelJob(jobId) {
-    if (confirm('Cancel this job?')) {
-        fetch('/api/job/' + jobId + '/cancel', {method: 'POST'})
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            });
-    }
+    if (!confirm('Cancel this job?')) return;
+
+    fetch('/api/job/' + jobId + '/cancel', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success || !data.error) {
+                showToast('Job cancelled', 'success');
+                location.reload();
+            } else {
+                showToast('Error: ' + (data.error || 'Unknown error'), 'danger');
+            }
+        })
+        .catch(err => {
+            showToast('Request failed: ' + err.message, 'danger');
+        });
 }
 </script>
 {% endblock %}

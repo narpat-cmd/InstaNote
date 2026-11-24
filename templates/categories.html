@@ -14,53 +14,33 @@
 <div class="row mb-4">
     <div class="col-xl-3 col-md-6 mb-3">
         <div class="card stat-card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Total Categories</h6>
-                        <h2 class="mb-0">{{ categories|length }}</h2>
-                    </div>
-                    <i class="bi bi-tag fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h2>{{ categories|length }}</h2>
+                <small>Total Categories</small>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6 mb-3">
         <div class="card stat-card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Categories with Posts</h6>
-                        <h2 class="mb-0">{{ categories|selectattr('post_count', 'gt', 0)|list|length }}</h2>
-                    </div>
-                    <i class="bi bi-check-circle fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h2>{{ categories|selectattr('post_count', 'gt', 0)|list|length }}</h2>
+                <small>Categories with Posts</small>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6 mb-3">
         <div class="card stat-card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Total Posts</h6>
-                        <h2 class="mb-0">{{ categories|sum(attribute='post_count') }}</h2>
-                    </div>
-                    <i class="bi bi-images fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h2>{{ categories|sum(attribute='post_count') }}</h2>
+                <small>Total Posts</small>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6 mb-3">
         <div class="card stat-card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Empty Categories</h6>
-                        <h2 class="mb-0">{{ categories|selectattr('post_count', 'eq', 0)|list|length }}</h2>
-                    </div>
-                    <i class="bi bi-x-circle fs-1 opacity-50"></i>
-                </div>
+            <div class="card-body text-center">
+                <h2>{{ categories|selectattr('post_count', 'eq', 0)|list|length }}</h2>
+                <small>Empty Categories</small>
             </div>
         </div>
     </div>
@@ -135,7 +115,7 @@
 
     const labels = categoryData.map(c => c.name);
     const values = categoryData.map(c => c.post_count);
-    const colors = [
+    const backgroundColors = [
         '#0d6efd', '#6610f2', '#6f42c1', '#d63384', '#dc3545',
         '#fd7e14', '#ffc107', '#198754', '#20c997', '#0dcaf0',
         '#6c757d', '#343a40', '#e83e8c', '#0d6efd', '#6610f2',
@@ -147,15 +127,16 @@
         values: values,
         type: 'pie',
         hole: 0.4,
-        marker: { colors: colors },
+        marker: { colors: backgroundColors },
         textinfo: 'label+percent',
-        hovertemplate: '%{label}: %{value} posts (%{percent})<extra></extra>'
+        hovertemplate: '%{label}: %{value} posts (%{percent})<extra></extra>',
+        textfont: { size: 12 }
     };
 
     const layout = {
         margin: { t: 10, r: 10, b: 10, l: 10 },
         showlegend: true,
-        legend: { orientation: 'h', y: -0.1 },
+        legend: { orientation: 'h', y: -0.1, x: 0, xanchor: 'center' },
         plot_bgcolor: 'rgba(0,0,0,0)',
         paper_bgcolor: 'rgba(0,0,0,0)'
     };

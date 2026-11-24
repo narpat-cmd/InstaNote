@@ -18,7 +18,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-title">Total Posts</h6>
-                        <h2 class="mb-0">{{ stats.total_posts }}</h2>
+                        <h2 id="totalPosts" class="mb-0">{{ stats.total_posts }}</h2>
                     </div>
                     <i class="bi bi-images fs-1 opacity-50"></i>
                 </div>
@@ -31,7 +31,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-title">Posts Today</h6>
-                        <h2 class="mb-0">{{ stats.today }} / {{ config.automation.daily_limit }}</h2>
+                        <h2 id="postsToday" class="mb-0">{{ stats.today }} / {{ config.automation.daily_limit }}</h2>
                     </div>
                     <i class="bi bi-calendar-day fs-1 opacity-50"></i>
                 </div>
@@ -44,7 +44,7 @@
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="card-title">This Week</h6>
-                        <h2 class="mb-0">{{ stats.this_week }}</h2>
+                        <h2 id="postsThisWeek" class="mb-0">{{ stats.this_week }}</h2>
                     </div>
                     <i class="bi bi-calendar-week fs-1 opacity-50"></i>
                 </div>
@@ -94,7 +94,7 @@
                 <div class="d-grid gap-2">
                     <div class="d-flex justify-content-between">
                         <span>Status</span>
-                        <span class="badge {% if scheduler_stats.is_running %}bg-success{% else %}bg-danger{% endif %}">
+                        <span id="schedulerStatus" class="badge {% if scheduler_stats.is_running %}bg-success{% else %}bg-danger{% endif %}">
                             {% if scheduler_stats.is_running %}Running{% else %}Stopped{% endif %}
                         </span>
                     </div>
@@ -138,7 +138,7 @@
 <div class="row">
     <div class="col-lg-6 mb-3">
         <div class="card">
-            <div class="card-header d-flex justify-content-between">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Posts</h5>
                 <a href="{{ url_for('topics') }}" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
@@ -157,7 +157,9 @@
                     </div>
                     {% else %}
                     <div class="list-group-item text-center text-muted py-4">
-                        No posts yet
+                        <i class="bi bi-images display-1 opacity-50"></i>
+                        <h5 class="text-muted mt-3">No posts yet</h5>
+                        <p class="text-muted">Generate your first infographic to get started!</p>
                     </div>
                     {% endfor %}
                 </div>
@@ -166,7 +168,7 @@
     </div>
     <div class="col-lg-6 mb-3">
         <div class="card">
-            <div class="card-header d-flex justify-content-between">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Recent Scheduler Jobs</h5>
                 <a href="{{ url_for('scheduler_view') }}" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
@@ -176,18 +178,18 @@
                     <div class="list-group-item">
                         <div class="d-flex justify-content-between">
                             <div>
-                                <strong>{{ job.topic.vehicle_name if job.topic else 'Unknown' }}</strong>
+                                <strong>{% if job.topic %}{{ job.topic.vehicle_year if job.topic.vehicle_year else '' }} {{ job.topic.vehicle_name }}{% else %}Unknown{% endif %}</strong>
                                 <br>
                                 <small class="text-muted">
                                     {% if job.topic %}{{ job.topic.category_key.replace('_', ' ').title() }}{% endif %}
                                 </small>
                             </div>
                             <div class="text-end">
-                                <span class="badge {% if job.status.value == 'completed' %}bg-success{% elif job.status.value == 'failed' %}bg-danger{% else %}bg-warning{% endif %}">
-                                    {{ job.status.value.title() }}
+                                <span class="badge {% if 'completed' in job.status or job.status.value == 'completed' %}bg-success{% elif job.status.value == 'failed' %}bg-danger{% else %}bg-warning{% endif %}">
+                                    {{ job.status.value.title() if job.status.value else job.status }}
                                 </span>
                                 <br>
-                                <small class="text-muted">{{ job.scheduled_time.strftime('%H:%M') }}</small>
+                                <small class="text-muted">{{ job.scheduled_time.strftime('%H:%M') if job.scheduled_time and job.scheduled_time is not string else job.scheduled_time }}</small>
                             </div>
                         </div>
                         {% if job.error %}
@@ -196,7 +198,9 @@
                     </div>
                     {% else %}
                     <div class="list-group-item text-center text-muted py-4">
-                        No jobs yet
+                        <i class="bi bi-clock-history display-1 opacity-50"></i>
+                        <h5 class="text-muted mt-3">No jobs yet</h5>
+                        <p class="text-muted">Click "Reschedule" to generate new scheduled posts</p>
                     </div>
                     {% endfor %}
                 </div>
@@ -226,7 +230,8 @@
         xaxis: { tickangle: -45 },
         yaxis: { title: 'Posts' },
         plot_bgcolor: 'rgba(0,0,0,0)',
-        paper_bgcolor: 'rgba(0,0,0,0)'
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: { size: 11 }
     };
 
     Plotly.newPlot('categoryChart', [trace], layout, {responsive: true});
@@ -236,23 +241,35 @@
     socket.on('stats_update', function(data) {
         // Update stats cards
         if (data.topics) {
-            document.querySelector('.stat-card.bg-primary h2').textContent = data.topics.total_posts;
-            document.querySelector('.stat-card.bg-success h2').textContent = data.topics.today + ' / ' + {{ config.automation.daily_limit }};
-            document.querySelector('.stat-card.bg-info h2').textContent = data.topics.this_week;
+            document.getElementById('totalPosts').textContent = data.topics.total_posts;
+            document.getElementById('postsToday').textContent = data.topics.today + ' / ' + {{ config.automation.daily_limit }};
+            document.getElementById('postsThisWeek').textContent = data.topics.this_week;
         }
         if (data.scheduler) {
-            document.querySelector('.stat-card.bg-warning h2').textContent =
-                (data.scheduler.successful_posts + data.scheduler.failed_posts > 0)
-                ? ((data.scheduler.successful_posts / (data.scheduler.successful_posts + data.scheduler.failed_posts) * 100).toFixed(1) + '%')
-                : 'N/A';
+            const total = data.scheduler.successful_posts + data.scheduler.failed_posts;
+            document.getElementById('successfulPosts').textContent = data.scheduler.successful_posts;
+            document.getElementById('failedPosts').textContent = data.scheduler.failed_posts;
+            document.getElementById('schedulerStatus').textContent = data.scheduler.is_running ? 'Running' : 'Stopped';
+            document.getElementById('schedulerStatus').className = 'badge ' + (data.scheduler.is_running ? 'bg-success' : 'bg-danger');
+            document.getElementById('pendingJobs').textContent = data.scheduler.pending_jobs;
+            document.getElementById('totalRuns').textContent = data.scheduler.total_runs;
         }
     });
 
     function triggerPostNow() {
-        fetch('/api/post-now', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+        const category = prompt('Category (optional):');
+        fetch('/api/post-now', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({category: category || null})
+        })
             .then(r => r.json())
             .then(data => {
-                alert('Job started: ' + data.job_id);
+                showToast('Job started: ' + data.job_id, 'success');
+                location.reload();
+            })
+            .catch(err => {
+                showToast('Request failed: ' + err.message, 'danger');
             });
     }
 </script>

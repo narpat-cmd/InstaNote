@@ -1,0 +1,30 @@
+# InstaNote Project Summary
+
+## Overview
+InstaNote is an automated Instagram content generation and scheduling platform designed specifically for automotive and structured informational content. It generates high-quality aesthetic handwritten and technical infographic images, manages automated posting schedules, provides a full web admin dashboard, and integrates with AI research and image generation tools.
+
+## Architecture & Core Modules (`src/`)
+- **`admin_panel.py`**: Flask-based web dashboard providing login, dashboard metrics, topic/category management, scheduler control, and generation controls with robust error handling and API endpoints.
+- **`content_generator.py`**: Infographic image generator using PIL/Pillow. Supports multi-slide infographics, notebook paper styles, headers, specs sections, footers, and vehicle placeholders.
+- **`scheduler.py`**: Automation and job queue manager handling scheduled posting tasks, tracking job status, retry logic, history logs, and background intervals.
+- **`researcher.py` / Research Module**: Gathers automotive facts, specifications, and details from Wikipedia, manufacturer sources, and structured databases.
+- **`database.py` / Storage**: Manages topics, post history, scheduled queue, and configuration state.
+- **`main.py`**: Application entry point initializing Flask app, scheduler, and workers.
+
+## Web Admin Panel & Features
+- **Authentication**: Secure login with session management.
+- **Dashboard**: Real-time stats on pending jobs, posted content, API quotas, and system health.
+- **Generate Page**: Custom UI for generating single or multi-slide infographics with style selection, category filtering, and instant preview/download.
+- **Scheduler View**: Monitor and manage automated posting schedules.
+- **Settings Page**: Configure Instagram credentials, AI models, schedules, and watermarks.
+
+## Configuration (`config.yaml`)
+- Instagram API settings (App ID, Secret, Access Token, User ID).
+- AI Image Provider & model configuration.
+- Research sources and timeout parameters.
+- Automation schedule times (e.g., 09:00, 14:00, 19:00).
+- Image dimensions (1080x1350), formats, and styles (Notebook Paper, Technical Specs, Doodle Design, etc.).
+
+## Deployment & Testing
+- **Deployment**: Configured for Render (`render.yaml`, `Dockerfile`, `deploy.sh`) with environment variable support.
+- **Testing Suite**: Comprehensive test scripts (`comprehensive_test.py`, `test_system.py`, `verify_all.py`, etc.) ensuring API endpoints, admin routes, and generation pipelines function correctly.

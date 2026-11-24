@@ -26,8 +26,8 @@
                 </select>
             </div>
             <div class="col-md-4 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary me-2"><i class="bi bi-funnel me-1"></i>Filter</button>
-                <a href="{{ url_for('topics') }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>Clear</a>
+                <button type="submit" class="btn btn-primary me-2"><i class="bi bi-funnel me-1"></i> Filter</button>
+                <a href="{{ url_for('topics') }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Clear</a>
             </div>
         </form>
     </div>
@@ -58,7 +58,8 @@
                     <tr>
                         <td>
                             {% if post.image_path %}
-                            <img src="{{ url_for('serve_image', filename=post.image_path.split('/')[-1]) }}"
+                            {% set image_filename = post.image_path.split('/')[-1] %}
+                            <img src="/images/{{ image_filename }}"
                                  alt="{{ post.vehicle_name }}" class="img-thumbnail" style="width: 80px; height: 100px; object-fit: cover;">
                             {% else %}
                             <span class="text-muted">No image</span>
@@ -85,7 +86,8 @@
                         <td>
                             <div class="btn-group btn-group-sm">
                                 {% if post.image_path %}
-                                <a href="{{ url_for('serve_image', filename=post.image_path.split('/')[-1]) }}"
+                                {% set image_filename = post.image_path.split('/')[-1] %}
+                                <a href="/images/{{ image_filename }}"
                                    target="_blank" class="btn btn-outline-secondary" title="View Image">
                                     <i class="bi bi-eye"></i>
                                 </a>
@@ -141,10 +143,14 @@ function deleteTopic(id) {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    location.reload();
+                    showToast('Topic deleted', 'success');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error, 'danger');
                 }
+            })
+            .catch(err => {
+                showToast('Request failed: ' + err.message, 'danger');
             });
     }
 }

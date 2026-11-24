@@ -12,13 +12,15 @@ from flask_socketio import SocketIO, emit
 import plotly.graph_objs as go
 import plotly.utils
 
-from src.config import get_config
-from src.topic_selector import TopicSelector, VEHICLE_CATEGORIES
-from src.scheduler import get_scheduler, InstaNoteScheduler, JobStatus
-from src.content_generator import get_content_generator
+from src.config import get_config, project_path
+from src.topic_selector import TopicSelector, VEHICLE_CATEGORIES, Topic
+from src.scheduler import get_scheduler, InstaNoteScheduler, JobStatus, Job
+from src.content_generator import get_content_generator, InfographicGenerator
+from src.researcher import get_researcher
 from src.instagram_poster import get_instagram_poster
 from src.utils import setup_logging, format_file_size, time_ago, slugify
 from src.config import load_config, reload_config
+from flask import send_from_directory
 import yaml
 
 
@@ -78,6 +80,13 @@ def create_app(config_path: Optional[str] = None) -> tuple:
         # सीधे login पेज पर रीडायरेक्ट
         return redirect(url_for('login'))
 
+    @app.route('/images/<path:filename>')
+    @login_required
+    def serve_image(filename):
+        """Serve generated images"""
+        image_dir = project_path('output')
+        return send_from_directory(image_dir, filename)
+
     @app.route('/topics')
     @login_required
     def topics():
@@ -124,12 +133,13 @@ def create_app(config_path: Optional[str] = None) -> tuple:
     @login_required
     def scheduler_view():
         all_jobs = scheduler.get_all_jobs()
-        jobs = [(jid, jdata) for jid, jdata in all_jobs.items() if jdata.get('status').value == 'pending']
+        # Get pending jobs as Job objects
+        pending_jobs = scheduler.get_pending_jobs()
         history = scheduler.get_recent_history(50)
         stats = scheduler.get_stats()
 
         return render_template('scheduler.html',
-                             pending_jobs=jobs,
+                             pending_jobs=pending_jobs,
                              history=history,
                              stats=stats,
                              config=get_config().automation)
@@ -212,7 +222,9 @@ def create_app(config_path: Optional[str] = None) -> tuple:
         job = scheduler.post_now(category)
         return jsonify({
             'job_id': job.id,
-            'status': job.status.value
+            'status': job.status.value,
+            'topic': job.topic,
+            'scheduled_time': job.scheduled_time.isoformat()
         })
 
     @app.route('/api/job/<job_id>')
@@ -225,13 +237,13 @@ def create_app(config_path: Optional[str] = None) -> tuple:
         return jsonify({
             'id': job.id,
             'status': job.status.value,
-            'topic': job.topic.__dict__ if job.topic else None,
-            'scheduled_time': job.scheduled_time.isoformat(),
+            'topic': job.topic,  # topic is already a dict
+            'scheduled_time': job.scheduled_time.isoformat() if job.scheduled_time else None,
             'started_at': job.started_at.isoformat() if job.started_at else None,
             'completed_at': job.completed_at.isoformat() if job.completed_at else None,
             'error': job.error,
-            'image_path': job.image_result.image_path if job.image_result else None,
-            'post_id': job.post_result.instagram_post_id if job.post_result else None
+            'image_path': job.image_result.get('image_path') if job.image_result else None,
+            'post_id': job.post_result.get('instagram_post_id') if job.post_result else None
         })
 
     @app.route('/api/reschedule', methods=['POST'])
@@ -285,6 +297,35 @@ def create_app(config_path: Optional[str] = None) -> tuple:
             'style': result.style_used,
             'generation_time': result.generation_time
         })
+
+    @app.route('/api/generate-post', methods=['POST'])
+    @login_required
+    def api_generate_post():
+        """Post a generated image to Instagram"""
+        try:
+            data = request.json
+            if not data:
+                return jsonify({'success': False, 'error': 'Invalid JSON payload'}), 400
+
+            image_path = data.get('image_path')
+            caption = data.get('caption', '')
+            hashtags = data.get('hashtags', [])
+
+            if not image_path:
+                return jsonify({'success': False, 'error': 'Missing image_path'})
+
+            # Post to Instagram
+            post_result = instagram_poster.updatable_post(image_path, caption, hashtags)
+
+            return jsonify({
+                'success': post_result.get('status') == 'success',
+                'instagram_post_id': post_result.get('id'),
+                'permalink': post_result.get('permalink'),
+                'error': post_result.get('error')
+            })
+        except Exception as e:
+            logger.error(f"Instagram post failed: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/settings', methods=['GET', 'POST'])
     @login_required

@@ -11,7 +11,6 @@ let isConnected = false;
 document.addEventListener('DOMContentLoaded', function() {
     initializeSocket();
     initializeTooltips();
-    initializePopovers();
     setupGlobalEventListeners();
 });
 
@@ -55,10 +54,6 @@ function initializeSocket() {
     socket.on('job_update', function(data) {
         handleJobUpdate(data);
     });
-
-    socket.on('notification', function(data) {
-        showToast(data.message, data.type || 'info');
-    });
 }
 
 /**
@@ -76,7 +71,6 @@ function updateConnectionStatus(connected) {
  * Handle stats update from server
  */
 function handleStatsUpdate(data) {
-    // Update stat cards if they exist
     if (data.topics) {
         updateStatCard('totalPosts', data.topics.total_posts);
         updateStatCard('postsToday', data.topics.today);
@@ -88,7 +82,6 @@ function handleStatsUpdate(data) {
         updateStatCard('successfulPosts', data.scheduler.successful_posts);
         updateStatCard('failedPosts', data.scheduler.failed_posts);
 
-        // Update scheduler status badge
         const statusBadge = document.getElementById('schedulerStatus');
         if (statusBadge) {
             statusBadge.className = 'badge ' + (data.scheduler.is_running ? 'bg-success' : 'bg-danger');
@@ -101,7 +94,6 @@ function handleStatsUpdate(data) {
  * Handle job update from server
  */
 function handleJobUpdate(data) {
-    // Update specific job row if it exists
     const jobRow = document.getElementById('job-' + data.job_id);
     if (jobRow) {
         const statusCell = jobRow.querySelector('.job-status');
@@ -109,12 +101,6 @@ function handleJobUpdate(data) {
             statusCell.className = 'badge ' + getStatusBadgeClass(data.status);
             statusCell.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
         }
-    }
-
-    // Refresh page if on scheduler page and job completed
-    if (data.status === 'completed' || data.status === 'failed') {
-        // Could trigger a partial refresh or full reload
-        console.log('Job completed:', data);
     }
 }
 
@@ -143,26 +129,6 @@ function updateStatCard(id, value) {
 }
 
 /**
- * Initialize Bootstrap tooltips
- */
-function initializeTooltips() {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function(tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-}
-
-/**
- * Initialize Bootstrap popovers
- */
-function initializePopovers() {
-    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.map(function(popoverTriggerEl) {
-        return new bootstrap.Popover(popoverTriggerEl);
-    });
-}
-
-/**
  * Setup global event listeners
  */
 function setupGlobalEventListeners() {
@@ -184,34 +150,6 @@ function setupGlobalEventListeners() {
             }
         }
     });
-
-    // Copy to clipboard
-    document.addEventListener('click', function(e) {
-        if (e.target.matches('[data-copy]')) {
-            const text = e.target.getAttribute('data-copy');
-            copyToClipboard(text);
-            showToast('Copied to clipboard!', 'success');
-        }
-    });
-}
-
-/**
- * Copy text to clipboard
- */
-function copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
-    }
-
-    // Fallback for older browsers
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-9999px';
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
 }
 
 /**
@@ -225,12 +163,7 @@ function showToast(message, type = 'info') {
     toast.setAttribute('role', 'alert');
     toast.setAttribute('aria-live', 'assertive');
     toast.setAttribute('aria-atomic', 'true');
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${message}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-    `;
+    toast.innerHTML = '<div class="d-flex"><div class="toast-body">' + escapeHtml(message) + '</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
 
     container.appendChild(toast);
 
@@ -245,6 +178,15 @@ function showToast(message, type = 'info') {
     toast.addEventListener('hidden.bs.toast', function() {
         toast.remove();
     });
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 /**
@@ -358,23 +300,15 @@ async function apiRequest(url, options = {}) {
 }
 
 /**
- * Refresh current page data
- */
-function refreshPage() {
-    window.location.reload();
-}
-
-/**
  * Export functions to global scope for use in templates
  */
 window.InstaNote = {
     showToast,
-    copyToClipboard,
     formatDate,
     formatRelativeTime,
     apiRequest,
-    refreshPage,
     debounce,
     throttle,
-    socket: () => socket
+    socket: () => socket,
+    escapeHtml
 };

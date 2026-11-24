@@ -2,11 +2,12 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime, timedelta
 import threading
 import time
 from enum import Enum
+from dataclasses import dataclass
 
 HISTORY_FILE = Path(__file__).parent.parent / "data" / "scheduler_state.json"
 
@@ -20,12 +21,28 @@ class JobStatus(Enum):
     CANCELLED = "cancelled"
 
 
+@dataclass
+class Job:
+    """Represents a scheduled posting job"""
+    id: str
+    scheduled_time: datetime
+    status: JobStatus = JobStatus.PENDING
+    topic: Optional[dict] = None
+    created_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error: Optional[str] = None
+    image_result: Optional[dict] = None
+    post_result: Optional[dict] = None
+    kwargs: Optional[dict] = None
+
+
 class InstaNoteScheduler:
     """Main scheduler class for InstaNote automation"""
-    
+
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
         if cls._instance is None:
             with cls._lock:
@@ -33,72 +50,222 @@ class InstaNoteScheduler:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
         self._initialized = True
         self.scheduler = Scheduler()
-        self._jobs: Dict[str, dict] = {}
-    
-    def add_job(self, job_id: str, func, schedule: str, **kwargs):
+        self._jobs: Dict[str, Job] = {}
+        self._job_history: list = []
+
+    def add_job(self, job: Job):
         """Add a scheduled job"""
-        self._jobs[job_id] = {
-            'func': func,
-            'schedule': schedule,
-            'kwargs': kwargs,
-            'status': JobStatus.PENDING
-        }
-    
-    def get_job(self, job_id: str) -> Optional[dict]:
+        self._jobs[job.id] = job
+
+    def get_job(self, job_id: str) -> Optional[Job]:
         """Get job by ID"""
         return self._jobs.get(job_id)
-    
+
+    def get_job_status(self, job_id: str) -> Optional[Job]:
+        """Get job status by ID"""
+        return self._jobs.get(job_id)
+
     def cancel_job(self, job_id: str):
         """Cancel a job"""
         if job_id in self._jobs:
-            self._jobs[job_id]['status'] = JobStatus.CANCELLED
-    
+            job = self._jobs[job_id]
+            job.status = JobStatus.CANCELLED
+            job.completed_at = datetime.now()
+
     def get_all_jobs(self) -> Dict[str, dict]:
-        """Get all jobs"""
-        return self._jobs.copy()
-    
+        """Get all jobs as dictionaries"""
+        return {jid: self._job_to_dict(j) for jid, j in self._jobs.items()}
+
+    def _job_to_dict(self, job: Job) -> dict:
+        """Convert a Job object to dictionary"""
+        return {
+            'id': job.id,
+            'status': job.status,
+            'topic': job.topic,
+            'scheduled_time': job.scheduled_time,
+            'created_at': job.created_at,
+            'started_at': job.started_at,
+            'completed_at': job.completed_at,
+            'error': job.error,
+            'image_result': job.image_result,
+            'post_result': job.post_result,
+            'kwargs': job.kwargs
+        }
+
+    def reschedule(self, category: Optional[str] = None):
+        """Generate and schedule new jobs"""
+        from .topic_selector import Topic, select_random_topic
+        from .content_generator import get_content_generator
+        from .config import get_config
+
+        cfg = get_config().automation
+        now = datetime.now()
+
+        # Generate jobs for configured post times
+        for time_str in cfg.post_times:
+            try:
+                hour, minute = map(int, time_str.split(':'))
+                scheduled_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if scheduled_time <= now:
+                    scheduled_time += timedelta(days=1)
+
+                # Select topic
+                topic_data = select_random_topic(category=category)
+                topic = Topic(
+                    category_key=topic_data['category'],
+                    vehicle_name=topic_data['vehicle'],
+                    vehicle_year=2025
+                )
+
+                job_id = f"{int(scheduled_time.timestamp())}"
+                job = Job(
+                    id=job_id,
+                    scheduled_time=scheduled_time,
+                    topic=topic.to_dict(),
+                    kwargs={'category': category}
+                )
+
+                self._jobs[job_id] = job
+            except Exception as e:
+                print(f"Error creating job: {e}")
+
+        return list(self._jobs.keys())
+
+    def post_now(self, category: Optional[str] = None) -> Job:
+        """Create and execute a job immediately"""
+        from .topic_selector import Topic, select_random_topic
+        from .researcher import get_researcher
+        from .content_generator import get_content_generator
+        from .instagram_poster import get_instagram_poster
+
+        # Select topic
+        topic_data = select_random_topic(category=category)
+        topic = Topic(
+            category_key=topic_data['category'],
+            vehicle_name=topic_data['vehicle']
+        )
+
+        job_id = f"{int(datetime.now().timestamp())}"
+        job = Job(
+            id=job_id,
+            scheduled_time=datetime.now(),
+            topic=topic.to_dict()
+        )
+
+        self._jobs[job_id] = job
+
+        # Execute the job
+        self._execute_job(job_id)
+
+        return job
+
+    def _execute_job(self, job_id: str):
+        """Execute a scheduled job"""
+        if job_id not in self._jobs:
+            return
+
+        job = self._jobs[job_id]
+        job.status = JobStatus.RUNNING
+        job.started_at = datetime.now()
+
+        try:
+            # Research vehicle
+            if job.topic:
+                researcher = get_researcher()
+                specs = researcher.research(job.topic)
+
+                # Generate image
+                content_gen = get_content_generator()
+                result = content_gen.generate(job.topic, specs)
+
+                job.image_result = {
+                    'image_path': str(result.image_path),
+                    'style_used': result.style_used,
+                    'generation_time': result.generation_time
+                }
+
+                job.status = JobStatus.COMPLETED
+                job.completed_at = datetime.now()
+
+        except Exception as e:
+            job.status = JobStatus.FAILED
+            job.completed_at = datetime.now()
+            job.error = str(e)
+
+        # Add to history
+        self._job_history.append(job)
+        if len(self._job_history) > 100:
+            self._job_history = self._job_history[-100:]
+
     def get_stats(self) -> Dict:
         """Get scheduler statistics for dashboard"""
         return {
             'total_jobs': len(self._jobs),
-            'pending_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.PENDING),
-            'running_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.RUNNING),
-            'completed_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.COMPLETED),
-            'failed_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.FAILED),
+            'success': True if self.scheduler.running else False,
+            'is_running': self.scheduler.running,
+            'pending_jobs': sum(1 for j in self._jobs.values() if j.status == JobStatus.PENDING),
+            'running_jobs': sum(1 for j in self._jobs.values() if j.status == JobStatus.RUNNING),
+            'completed_jobs': sum(1 for j in self._jobs.values() if j.status == JobStatus.COMPLETED),
+            'failed_jobs': sum(1 for j in self._jobs.values() if j.status == JobStatus.FAILED),
+            'successful_posts': sum(1 for j in self._jobs.values() if j.status == JobStatus.COMPLETED),
+            'failed_posts': sum(1 for j in self._jobs.values() if j.status == JobStatus.FAILED),
+            'total_runs': len(self._jobs),
+            'last_post_time': self._get_last_post_time(),
+            'next_post_time': self._get_next_post_time(),
         }
-    
+
+    def _get_last_post_time(self) -> Optional[str]:
+        """Get the timestamp of the most recently completed job"""
+        completed_jobs = [j for j in self._jobs.values() if j.status == JobStatus.COMPLETED]
+        if not completed_jobs:
+            return None
+        sorted_jobs = sorted(completed_jobs, key=lambda x: x.completed_at or datetime.min, reverse=True)
+        latest = sorted_jobs[0]
+        return latest.completed_at.isoformat() if latest.completed_at else None
+
+    def _get_next_post_time(self) -> Optional[str]:
+        """Get the next pending job's scheduled time"""
+        pending_jobs = [j for j in self._jobs.values() if j.status == JobStatus.PENDING]
+        if not pending_jobs:
+            return None
+        sorted_jobs = sorted(pending_jobs, key=lambda x: x.scheduled_time or datetime.min)
+        return sorted_jobs[0].scheduled_time.isoformat() if sorted_jobs[0].scheduled_time else None
+
     def get_recent_history(self, limit: int = 10) -> list:
         """Get recent job history for dashboard"""
         history = []
-        for job_id, job_data in self._jobs.items():
+        for job in list(self._jobs.values())[:limit]:
             entry = {
-                'job_id': job_id,
-                'schedule': job_data.get('schedule', 'unknown'),
-                'status': job_data.get('status', JobStatus.PENDING).value,
-                'created_at': job_data.get('created_at', 'unknown')
+                'id': job.id,
+                'topic': job.topic,
+                'status': job.status,
+                'scheduled_time': job.scheduled_time,
+                'started_at': job.started_at,
+                'completed_at': job.completed_at,
+                'error': job.error,
+                'kwargs': job.kwargs
             }
             history.append(entry)
-        # Sort by created_at descending and return top 'limit' entries
-        history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        # Sort by scheduled_time descending and return top 'limit' entries
+        history.sort(key=lambda x: x.get('scheduled_time') or datetime.min, reverse=True)
         return history[:limit]
-    
+
     def get_pending_jobs(self) -> list:
-        """Get pending jobs for dashboard"""
-        return [
-            {
-                'job_id': job_id,
-                'schedule': job_data.get('schedule', 'unknown'),
-                'created_at': job_data.get('created_at', 'unknown')
-            }
-            for job_id, job_data in self._jobs.items()
-            if job_data.get('status') == 'pending' or job_data.get('status') == JobStatus.PENDING
-        ]
+        """Get pending jobs for dashboard - returns Job objects for template access"""
+        return [j for j in self._jobs.values() if j.status == JobStatus.PENDING]
+
+    def cancel_job(self, job_id: str):
+        """Cancel a running or pending job"""
+        if job_id in self._jobs:
+            job = self._jobs[job_id]
+            job.status = JobStatus.CANCELLED
+            job.completed_at = datetime.now()
 
 
 def get_scheduler() -> InstaNoteScheduler:
