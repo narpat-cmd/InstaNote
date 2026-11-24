@@ -97,7 +97,7 @@ class InstaNoteScheduler:
                 'created_at': job_data.get('created_at', 'unknown')
             }
             for job_id, job_data in self._jobs.items()
-            if job_data.get('status') == JobStatus.PENDING
+            if job_data.get('status') == 'pending' or job_data.get('status') == JobStatus.PENDING
         ]
 
 
