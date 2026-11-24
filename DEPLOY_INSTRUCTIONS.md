@@ -18,6 +18,9 @@
    - `ADMIN_PASSWORD` = `your-secure-password`
    - `SECRET_KEY` = `your-random-secret-key`
    - `PYTHON_VERSION` = `3.11`
+   - `DB_PATH` = `instanote.db`
+   - `LOG_FILE` = `instanote.log`
+   - `LOG_LEVEL` = `INFO`
 7. Click **"Create Web Service"**
 
 ### Option 2: Using render.yaml (Infrastructure as Code)

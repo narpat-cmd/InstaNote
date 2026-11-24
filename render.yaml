@@ -12,3 +12,9 @@ services:
         value: "render-admin-password"
       - key: SECRET_KEY
         value: "render-secret-key-change-me"
+      - key: DB_PATH
+        value: "instanote.db"
+      - key: LOG_FILE
+        value: "instanote.log"
+      - key: LOG_LEVEL
+        value: "INFO"
