@@ -62,6 +62,16 @@ class InstaNoteScheduler:
     def get_all_jobs(self) -> Dict[str, dict]:
         """Get all jobs"""
         return self._jobs.copy()
+    
+    def get_stats(self) -> Dict:
+        """Get scheduler statistics for dashboard"""
+        return {
+            'total_jobs': len(self._jobs),
+            'pending_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.PENDING),
+            'running_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.RUNNING),
+            'completed_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.COMPLETED),
+            'failed_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.FAILED),
+        }
 
 
 def get_scheduler() -> InstaNoteScheduler:
