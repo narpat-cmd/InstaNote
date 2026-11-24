@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+import re
+
+with open('D:/InstaNote/src/admin_panel.py', 'r') as f:
+    lines = f.readlines()
+
+# Output specific line ranges
+with open('D:/InstaNote/login_section.txt', 'w') as out:
+    out.write('=== LINES 59-100 (LOGIN FUNCTION) ===\n')
+    for i in range(58, 100):
+        if i < len(lines):
+            out.write(f'{i+1}| {lines[i]}')
+    
+    out.write('\n\n=== LINES 76-80 (ROOT ROUTE) ===\n')
+    for i in range(75, 80):
+        if i < len(lines):
+            out.write(f'{i+1}| {lines[i]}')
+    
+    out.write('\n\n=== LINES 81-103 (TOPICS ROUTE) ===\n')
+    for i in range(80, 103):
+        if i < len(lines):
+            out.write(f'{i+1}| {lines[i]}')
