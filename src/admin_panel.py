@@ -74,22 +74,9 @@ def create_app(config_path: Optional[str] = None) -> tuple:
         return redirect(url_for('login'))
 
     @app.route('/')
-    @login_required
     def dashboard():
-        stats = topic_selector.get_stats()
-        scheduler_stats = scheduler.get_stats()
-        recent_posts = topic_selector.get_published_history(limit=10)
-        recent_jobs = scheduler.get_recent_history(limit=10)
-
-        # Prepare chart data
-        category_data = stats.get('by_category', {})
-
-        return render_template('dashboard.html',
-                             stats=stats,
-                             scheduler_stats=scheduler_stats,
-                             recent_posts=recent_posts,
-                             recent_jobs=recent_jobs,
-                             category_data=category_data)
+        # सीधे login पेज पर रीडायरेक्ट
+        return redirect(url_for('login'))
 
     @app.route('/topics')
     @login_required
