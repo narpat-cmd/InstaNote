@@ -162,3 +162,15 @@ def prepare_hashtags(vehicle_specs: Dict) -> List[str]:
         base_tags.append('#ClassicCars')
     
     return base_tags
+
+
+# Singleton instance for InstagramPoster
+_instagram_poster_instance = None
+
+
+def get_instagram_poster() -> InstagramPoster:
+    """Get singleton instance of InstagramPoster"""
+    global _instagram_poster_instance
+    if _instagram_poster_instance is None:
+        _instagram_poster_instance = InstagramPoster()
+    return _instagram_poster_instance
