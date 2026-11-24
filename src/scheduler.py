@@ -247,7 +247,9 @@ class InstaNoteScheduler:
                 'status': job.status,
                 'scheduled_time': job.scheduled_time,
                 'started_at': job.started_at,
+                'started_time': job.started_at,  # Template compatibility
                 'completed_at': job.completed_at,
+                'completed_time': job.completed_at,  # Template compatibility
                 'error': job.error,
                 'kwargs': job.kwargs
             }

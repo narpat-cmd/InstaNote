@@ -178,18 +178,30 @@
                     <div class="list-group-item">
                         <div class="d-flex justify-content-between">
                             <div>
-                                <strong>{% if job.topic %}{{ job.topic.vehicle_year if job.topic.vehicle_year else '' }} {{ job.topic.vehicle_name }}{% else %}Unknown{% endif %}</strong>
+                                <strong>
+                                    {% if job.topic %}
+                                        {% if job.topic.vehicle_year %}{{ job.topic.vehicle_year }} {% endif %}
+                                        {{ job.topic.vehicle_name }}
+                                    {% else %}Unknown{% endif %}
+                                </strong>
                                 <br>
                                 <small class="text-muted">
-                                    {% if job.topic %}{{ job.topic.category_key.replace('_', ' ').title() }}{% endif %}
+                                    {% if job.topic and job.topic.category_key %}
+                                        {{ job.topic.category_key.replace('_', ' ').title() }}
+                                    {% endif %}
                                 </small>
                             </div>
                             <div class="text-end">
-                                <span class="badge {% if 'completed' in job.status or job.status.value == 'completed' %}bg-success{% elif job.status.value == 'failed' %}bg-danger{% else %}bg-warning{% endif %}">
-                                    {{ job.status.value.title() if job.status.value else job.status }}
+                                {% set status_val = job.status.value if job.status.value is defined else job.status %}
+                                <span class="badge {% if 'completed' in status_val or status_val == 'completed' %}bg-success{% elif status_val == 'failed' %}bg-danger{% else %}bg-warning{% endif %}">
+                                    {% if status_val is string %}{{ status_val.title() }}{% else %}{{ status_val }}{% endif %}
                                 </span>
                                 <br>
-                                <small class="text-muted">{{ job.scheduled_time.strftime('%H:%M') if job.scheduled_time and job.scheduled_time is not string else job.scheduled_time }}</small>
+                                <small class="text-muted">
+                                    {% if job.scheduled_time %}
+                                        {% if job.scheduled_time is string %}{{ job.scheduled_time }}{% else %}{{ job.scheduled_time.strftime('%H:%M') }}{% endif %}
+                                    {% endif %}
+                                </small>
                             </div>
                         </div>
                         {% if job.error %}

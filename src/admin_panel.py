@@ -77,13 +77,33 @@ def create_app(config_path: Optional[str] = None) -> tuple:
 
     @app.route('/')
     def dashboard():
-        # सीधे login पेज पर रीडायरेक्ट
-        return redirect(url_for('login'))
+        # Check if logged in - redirect to login if not
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+
+        # Get stats for dashboard
+        stats = topic_selector.get_stats()
+        scheduler_stats = scheduler.get_stats()
+        category_data = stats.get('by_category', {})
+
+        # Get recent posts
+        recent_posts = topic_selector.get_published_history(limit=10)
+
+        # Get recent scheduler jobs
+        recent_jobs = scheduler.get_recent_history(limit=10)
+
+        return render_template('dashboard.html',
+                             stats=stats,
+                             scheduler_stats=scheduler_stats,
+                             category_data=category_data,
+                             recent_posts=recent_posts,
+                             recent_jobs=recent_jobs,
+                             config=get_config())
 
     @app.route('/images/<path:filename>')
     @login_required
     def serve_image(filename):
-        """Serve generated images"""
+        """Serve generated images from output folder"""
         image_dir = project_path('output')
         return send_from_directory(image_dir, filename)
 
@@ -133,7 +153,6 @@ def create_app(config_path: Optional[str] = None) -> tuple:
     @login_required
     def scheduler_view():
         all_jobs = scheduler.get_all_jobs()
-        # Get pending jobs as Job objects
         pending_jobs = scheduler.get_pending_jobs()
         history = scheduler.get_recent_history(50)
         stats = scheduler.get_stats()
@@ -291,11 +310,16 @@ def create_app(config_path: Optional[str] = None) -> tuple:
 
         result = content_generator.generate(topic, specs, style)
 
+        # Get caption and hashtags for the result
+        caption, hashtags = content_generator.generate_caption(topic, specs)
+
         return jsonify({
             'success': True,
             'image_path': result.image_path,
             'style': result.style_used,
-            'generation_time': result.generation_time
+            'generation_time': result.generation_time,
+            'caption': caption,
+            'hashtags': hashtags
         })
 
     @app.route('/api/generate-post', methods=['POST'])
