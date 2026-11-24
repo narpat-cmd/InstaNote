@@ -72,6 +72,21 @@ class InstaNoteScheduler:
             'completed_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.COMPLETED),
             'failed_jobs': sum(1 for j in self._jobs.values() if j['status'] == JobStatus.FAILED),
         }
+    
+    def get_recent_history(self, limit: int = 10) -> list:
+        """Get recent job history for dashboard"""
+        history = []
+        for job_id, job_data in self._jobs.items():
+            entry = {
+                'job_id': job_id,
+                'schedule': job_data.get('schedule', 'unknown'),
+                'status': job_data.get('status', JobStatus.PENDING).value,
+                'created_at': job_data.get('created_at', 'unknown')
+            }
+            history.append(entry)
+        # Sort by created_at descending and return top 'limit' entries
+        history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return history[:limit]
 
 
 def get_scheduler() -> InstaNoteScheduler:
