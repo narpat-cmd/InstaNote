@@ -62,7 +62,7 @@ def create_app(config_path: Optional[str] = None) -> tuple:
             if password == config.admin.secret_key or password == os.environ.get('ADMIN_PASSWORD', ''):
                 session['logged_in'] = True
                 session['login_time'] = datetime.now().isoformat()
-                next_url = request.args.get('next') or url_for('dashboard')
+                next_url = request.args.get('next') or url_for('topics')
                 return redirect(next_url)
             else:
                 flash('Invalid password', 'error')
